@@ -1,61 +1,59 @@
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:jwt_decoder/jwt_decoder.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-class LogInPage extends StatefulWidget {
+class SignUp extends StatefulWidget {
   @override
-  _LogInPageState createState() => _LogInPageState();
+  _SignUpState createState() => _SignUpState();
 }
 
-class _LogInPageState extends State<LogInPage> {
-  bool isChecked = false;
-  TextEditingController email = TextEditingController();
-  TextEditingController password = TextEditingController();
+class _SignUpState extends State<SignUp> {
+  TextEditingController emailController = TextEditingController();
+  TextEditingController passwordController = TextEditingController();
+  TextEditingController confirmPasswordController = TextEditingController();
+  TextEditingController userNameController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
 
-  Future<void> signIn(String email, String password) async {
-    final loginUrl =
-        'https://cbf0-102-40-93-191.ngrok-free.app/api/auth/signin';
+  Future<void> registerUser(
+      String email, String password, String userName) async {
+    final registerUrl =
+        'https://cbf0-102-40-93-191.ngrok-free.app/api/auth/signup';
 
     try {
       final response = await http.post(
-        Uri.parse(loginUrl),
+        Uri.parse(registerUrl),
         headers: {
           'Content-Type': 'application/json',
         },
         body: json.encode({
           'email': email,
           'password': password,
+          'userName': userName,
         }),
       );
+
       final data = json.decode(response.body);
       if (response.statusCode == 200 && data['success']) {
-        String token = data['access_token'];
-        Map<String, dynamic> decodedToken = JwtDecoder.decode(token);
-
-        String userId = decodedToken['sub'];
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Login successful! User ID: $userId'),
+            content: Text('Registration successful!'),
             duration: Duration(seconds: 5),
           ),
         );
-        // Navigator.of(context).pushReplacementNamed('/mainPage');
+        Navigator.of(context).pushReplacementNamed('/login');
       } else {
+        final errorMessage = data['message'];
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(data['message']),
+            content: Text(errorMessage),
           ),
         );
       }
     } catch (e) {
-      print('Error during login: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('An error occurred during login.'),
+          content: Text('An error occurred during registration: $e'),
         ),
       );
     }
@@ -66,34 +64,55 @@ class _LogInPageState extends State<LogInPage> {
     return Container(
       child: Scaffold(
         backgroundColor: Colors.white,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          iconTheme: IconThemeData(
+            color: Colors.black,
+          ),
+        ),
         body: SingleChildScrollView(
           child: Form(
             key: _formKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SizedBox(height: 130),
+                SizedBox(height: 10),
                 Padding(
                   padding: EdgeInsets.only(left: 35),
                   child: Text(
-                    'Welcome\nBack!',
+                    'Create Account\n& Start your Shift!',
                     style: TextStyle(
                         color: Colors.black,
-                        fontSize: 60,
+                        fontSize: 45,
                         fontFamily: GoogleFonts.anton().fontFamily),
                   ),
                 ),
-                SizedBox(height: MediaQuery.of(context).size.height * 0.05),
+                SizedBox(height: MediaQuery.of(context).size.height * 0.03),
                 Container(
                   margin: EdgeInsets.only(left: 35, right: 35),
                   child: Column(
                     children: [
-                      buildTextField('Email', email),
+                      buildTextField('UserName', userNameController),
                       SizedBox(
                         height: 30,
                       ),
-                      buildTextField('Password', password, isPassword: true),
-                      SizedBox(height: 20),
+                      buildTextField('Email', emailController),
+                      SizedBox(
+                        height: 30,
+                      ),
+                      buildTextField('Password', passwordController,
+                          isPassword: true),
+                      SizedBox(
+                        height: 30,
+                      ),
+                      buildTextField(
+                          'Confirm Password', confirmPasswordController,
+                          isPassword: true,
+                          compareToController: passwordController),
+                      SizedBox(
+                        height: 40,
+                      ),
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.black,
@@ -106,35 +125,17 @@ class _LogInPageState extends State<LogInPage> {
                         ),
                         onPressed: () {
                           if (_formKey.currentState!.validate()) {
-                            signIn(email.text, password.text);
+                            registerUser(
+                                emailController.text,
+                                passwordController.text,
+                                userNameController.text);
                           }
                         },
                         child: Text(
-                          'Login',
+                          'Register',
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      SizedBox(height: 30),
-                      Center(
-                        child: RichText(
-                          text: TextSpan(
-                            style: TextStyle(color: Colors.black, fontSize: 16),
-                            children: <TextSpan>[
-                              TextSpan(text: "Don't have an account? "),
-                              TextSpan(
-                                text: 'Sign Up',
-                                style: TextStyle(
-                                  decoration: TextDecoration.underline,
-                                ),
-                                recognizer: TapGestureRecognizer()
-                                  ..onTap = () {
-                                    Navigator.pushNamed(context, '/signup');
-                                  },
-                              ),
-                            ],
                           ),
                         ),
                       ),
@@ -151,7 +152,7 @@ class _LogInPageState extends State<LogInPage> {
   }
 
   Widget buildTextField(String label, TextEditingController controller,
-      {bool isPassword = false}) {
+      {bool isPassword = false, TextEditingController? compareToController}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
@@ -175,25 +176,13 @@ class _LogInPageState extends State<LogInPage> {
             if (value == null || value.trim().isEmpty) {
               return '$label is required';
             }
+            if (compareToController != null &&
+                value != compareToController.text) {
+              return 'Password does not match';
+            }
             return null;
           },
         ),
-        if (isPassword)
-          Padding(
-            padding: EdgeInsets.zero,
-            child: TextButton(
-              onPressed: () {},
-              child: Text(
-                'Forgot Password?',
-                style: TextStyle(
-                  decoration: TextDecoration.underline,
-                  color: Colors.black,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-          ),
       ],
     );
   }
